@@ -17,6 +17,8 @@
       "firebase-debug.*.log",
       ".github/**",
       "docs/**",
+      ".git/**",
+      "**/.git/**",
       "**/.*",
       "**/node_modules/**"
     ],

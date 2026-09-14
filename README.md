@@ -1,6 +1,11 @@
 # Junior Codex
 
+[![Deploy to Firebase](https://github.com/arkuprosper20-ship-it/petdut/actions/workflows/firebase-hosting-merge.yml/badge.svg)](https://github.com/arkuprosper20-ship-it/petdut/actions)
+[![Live site](https://img.shields.io/badge/live-codex--i.web.app-0BAF77)](https://codex-i.web.app)
+
 A community platform for young coders — onboarding, a member app (Home, Games, Chat, Suggestions, Settings, Contributors, Personalize), and a separate admin dashboard. Built in plain HTML/CSS/JS (no build step, no framework) and wired to **Firebase** for real accounts, live data, and file uploads.
+
+**Live:** https://codex-i.web.app · **Repo:** https://github.com/arkuprosper20-ship-it/petdut
 
 **Games:** Hackup (theme design with contrast validation), MVP's Throne (timed 50-line build challenge), Codex Primus (hidden-code decode duel with auto-grading).
 
@@ -18,6 +23,9 @@ A community platform for young coders — onboarding, a member app (Home, Games,
 | `data.js` | Static catalog only: avatar emoji set + the fixed 3-game list. Everything else is live Firestore data |
 | `app.js` | Logic for `index.html` |
 | `admin.js` | Logic for `admin.html` |
+| `sw.js` | Offline-first service worker (app shell cached, Firebase traffic bypasses cache) |
+| `404.html` | Custom "Lost in the code?" page for unknown routes |
+| `.github/workflows/` | CI: production deploy on push to `main`, preview channels on PRs (see `docs/DEPLOY.md`) |
 
 Keep all files together in one folder — `index.html` and `admin.html` both load `styles.css`, and the JS files import each other by relative path.
 
