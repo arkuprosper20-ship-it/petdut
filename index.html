@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Junior Codex — a community for young coders</title>
+<meta name="description" content="Junior Codex is where young coders learn, build, and hack together — events, games, chat, suggestions, themes, and a leaderboard.">
+<meta property="og:title" content="Junior Codex — a community for young coders">
+<meta property="og:description" content="Learn, build, and hack together: live events, coding games, chat, and themes.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="logo1.png">
+<link rel="apple-touch-icon" href="logo1.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0BAF77">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Junior Codex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<style>
+  .watermark{ position:fixed; inset:0; z-index:0; pointer-events:none; opacity:0.04; background:url('logo.png') center center no-repeat; background-size:60vmin; }
+  #app{ position:relative; z-index:1; min-height:100vh; }
+  .onboard{ position:relative; z-index:1; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 20px; }
+  .app-shell{ position:relative; z-index:1; }
+  #adminMain{ position:relative; z-index:1; }
+</style>
+<div class="watermark"></div>
+<div id="app">
+  <div class="banner" id="configBanner" style="display:none;max-width:520px;margin:16px auto 0;">
+    Firebase isn't connected yet — add your project keys to <code>firebase-config.js</code> to activate accounts, live data and uploads. The interface still works so you can preview it.
+  </div>
+
+  <!-- ================= ONBOARDING ================= -->
+  <div class="onboard" id="onboardWrap">
+    <div class="ob-card">
+      <div class="brand-row"><div class="logo-mark"><img src="logo.png" alt="Junior Codex"></div><div class="name">Junior Codex</div></div>
+      <div class="ob-eyebrow mono">&gt; a community for young coders<span class="cursor-blink">_</span></div>
+      <h1>Loading...</h1>
+      <p class="sub">If this stays here, check your browser console for errors.</p>
+    </div>
+  </div>
+
+  <!-- ================= MAIN APP SHELL ================= -->
+  <div class="app-shell" id="appShell">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="logo-mark"><img src="logo.png" alt="Junior Codex"></div>
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14.5px;">Junior Codex</div>
+          <div style="font-size:10.5px;color:var(--muted-2)" id="greetLine">Welcome back</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" title="AI Assistant" onclick="openAIChat()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1H2a1 1 0 01-1-1v-3a1 1 0 011-1h1a7 7 0 017-7h1v-1.27C13.6 5.39 13 5.74 13 6a2 2 0 012-2z"/><circle cx="9" cy="13" r="1"/><circle cx="15" cy="13" r="1"/></svg>
+        </button>
+        <a class="admin-toggle" href="admin.html">Admin view</a>
+        <button class="icon-btn" title="Sign out" onclick="handleSignOut()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
+        <button class="icon-btn" title="Notifications" onclick="toggleNotifications()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 8a6 6 0 1112 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6z"/><path d="M9.5 18a2.5 2.5 0 005 0"/></svg>
+          <span class="dot" id="notifDot" style="display:none;"></span>
+          <span class="lb-tag" id="notifCount" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--coral);color:white;font-size:9px;padding:1px 5px;border-radius:99px;border:1.5px solid var(--bg);">0</span>
+        </button>
+        <button class="icon-btn" title="Friend requests">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/><path d="M17 8h4M19 6v4"/></svg>
+        </button>
+      </div>
+      <!-- NOTIFICATION DROPDOWN -->
+      <div id="notifDropdown" style="display:none;position:absolute;top:60px;right:20px;width:320px;max-height:400px;overflow-y:auto;background:var(--panel-strong);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow);z-index:100;">
+        <div style="padding:14px;border-bottom:1px solid var(--border-soft);display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;font-weight:700;">Notifications</div>
+          <button class="btn btn-ghost btn-sm" onclick="markAllRead()" style="font-size:11px;">Mark all read</button>
+        </div>
+        <div id="notifList"></div>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- HOME -->
+      <section class="page active" id="page-home">
+        <div class="page-head">
+          <h2>Sessions</h2>
+          <p>What's happening across the community right now</p>
+        </div>
+
+        <div class="session-block">
+          <div class="session-title"><h3>New</h3><span class="status-pill new">NEW · 2 WKS</span></div>
+          <div class="event-row" id="row-new"></div>
+        </div>
+
+        <div class="session-block">
+          <div class="session-title"><h3>Ongoing</h3><span class="status-pill live">LIVE</span></div>
+          <div class="event-row" id="row-ongoing"></div>
+        </div>
+
+        <div class="session-block">
+          <div class="session-title"><h3>Past</h3><span class="status-pill past">ENDED</span></div>
+          <div class="event-row" id="row-past"></div>
+        </div>
+
+        <div class="filter-bar">
+          <select id="fYear"><option>2026</option><option>2025</option></select>
+          <select id="fMonth"><option>All months</option><option>August</option><option>September</option><option>October</option></select>
+          <select id="fPlace"><option>All places</option><option>Accra Hub</option><option>Kumasi Hub</option><option>Online</option></select>
+        </div>
+      </section>
+
+      <!-- GAMES -->
+      <section class="page" id="page-games">
+        <div class="page-head"><h2>Games</h2><p>Hack, host, and climb the leaderboard</p></div>
+        <div class="games-toolbar">
+          <div class="sort-toggle">
+            <button class="chip active" id="sortPlayed" onclick="setSort('played')">Most played</button>
+            <button class="chip" id="sortPopular" onclick="setSort('popular')">Popular</button>
+          </div>
+          <button class="btn btn-sm" onclick="toggleProposeGame()"> Propose a game</button>
+        </div>
+
+        <div class="glass toggle-panel" id="proposeGamePanel" style="display:none;padding:18px;margin-bottom:20px;">
+          <div class="field"><label>Game name</label><input type="text" id="pgName" placeholder="e.g. Bug Hunt"></div>
+          <div class="field"><label>Describe it</label><textarea id="pgDesc" style="min-height:60px" placeholder="How does it work?"></textarea></div>
+          <button class="btn btn-primary btn-sm" onclick="submitProposeGame()">Send for approval</button>
+        </div>
+
+        <div class="game-grid" id="gameGrid"></div>
+        <div class="page-head"><h2 style="font-size:17px">Leaderboard</h2></div>
+        <div class="glass leaderboard" id="leaderboard"></div>
+      </section>
+
+      <!-- SUGGESTIONS -->
+      <section class="page" id="page-suggest">
+        <div class="page-head"><h2>Suggestions</h2><p>Ideas go straight to the admin team</p></div>
+        <div class="suggest-input">
+          <div class="glass" style="flex:1;padding:4px;">
+            <textarea id="sugText" placeholder="What would make Junior Codex better?"></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="postSuggestion()">Send</button>
+        </div>
+        <div id="sugList"></div>
+      </section>
+
+      <!-- CHAT -->
+      <section class="page" id="page-chat">
+        <div id="chatListView">
+          <div class="page-head"><h2>Chat</h2><p>Direct message other members</p></div>
+          <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input type="text" placeholder="Search people to message" id="chatSearch" oninput="handleChatSearch()">
+          </div>
+          <div class="search-results" id="chatSearchResults"></div>
+          <div id="chatList"></div>
+        </div>
+
+        <div class="chat-thread" id="chatThread">
+          <div class="thread-head">
+            <button class="icon-btn" onclick="closeThread()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <div class="lb-avatar" id="threadAvatar"></div>
+            <div class="name" id="threadName"></div>
+            <button class="kebab" style="margin-left:auto;" onclick="blockActiveChat()">⋮</button>
+          </div>
+          <div class="thread-messages" id="threadMessages"></div>
+          <div class="thread-input">
+            <input type="text" id="threadInput" placeholder="Message...">
+            <button class="btn btn-primary btn-sm" onclick="sendThreadMessage()">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="page" id="page-settings">
+        <div class="page-head"><h2>Settings</h2><p>Your profile and preferences</p></div>
+        <div class="glass settings-section">
+          <h4>Profile</h4>
+          <div class="field"><label>Username</label><input type="text" id="setUsername"></div>
+          <div class="field"><label>Bio</label><textarea id="setBio" style="min-height:60px" placeholder="Tell the community about you"></textarea></div>
+          <div class="field"><label>Avatar</label>
+            <div class="avatar-picker" id="avatarPicker"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="saveSettings()">Save changes</button>
+        </div>
+        <div class="glass settings-section">
+          <h4>Notifications</h4>
+          <div class="toggle-row"><span>New events</span><div class="switch on" data-pref="notifyEvents" onclick="this.classList.toggle('on')"><i></i></div></div>
+          <div class="toggle-row"><span>Direct messages</span><div class="switch on" data-pref="notifyDMs" onclick="this.classList.toggle('on')"><i></i></div></div>
+          <div class="toggle-row"><span>Game invites</span><div class="switch" data-pref="notifyGames" onclick="this.classList.toggle('on')"><i></i></div></div>
+        </div>
+        <div class="glass settings-section">
+          <h4>AI Assistant</h4>
+          <div class="field"><label>Provider</label>
+            <select id="aiProvider" onchange="toggleAIKeyField()">
+              <option value="">— Select provider —</option>
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Gemini</option>
+              <option value="deepseek">DeepSeek</option>
+            </select>
+          </div>
+          <div class="field" id="aiKeyField" style="display:none;"><label>API Key</label><input type="password" id="aiApiKey" placeholder="Paste your API key here"></div>
+          <div class="field" id="aiModelField" style="display:none;"><label>Model</label><input type="text" id="aiModel" placeholder="e.g. gpt-4o-mini, gemini-2.0-flash"></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-sm btn-primary" onclick="saveAISettings()">Save AI settings</button>
+            <button class="btn btn-sm" onclick="testAISettings()">Test</button>
+          </div>
+          <p style="font-size:11px;color:var(--muted-2);margin-top:8px;">Keys are stored privately in your profile and never shared.</p>
+        </div>
+        <div class="glass settings-section">
+          <div class="toggle-row"><span>Allow friend requests</span><div class="switch on" data-pref="allowRequests" onclick="this.classList.toggle('on')"><i></i></div></div>
+          <div class="toggle-row"><span>Show on leaderboard</span><div class="switch on" data-pref="showOnLeaderboard" onclick="this.classList.toggle('on')"><i></i></div></div>
+        </div>
+      </section>
+
+      <!-- CONTRIBUTORS -->
+      <section class="page" id="page-contrib">
+        <div class="page-head"><h2>Contributors</h2><p>Members who shipped something for Junior Codex</p></div>
+        <div id="contribList"></div>
+      </section>
+
+      <!-- PERSONALIZE -->
+      <section class="page" id="page-personalize">
+        <div class="page-head"><h2>Personalize</h2><p>Pick a theme, or design and submit your own</p></div>
+        <div class="theme-grid" id="themeGrid"></div>
+
+        <div class="glass toggle-panel" id="designThemePanel" style="display:none;padding:18px;margin-top:18px;">
+          <div class="field"><label>Theme name</label><input type="text" id="thName" placeholder="e.g. Mint Paper"></div>
+          <div class="grid2">
+            <div class="field"><label>Background</label><input type="color" id="thBg" value="#F6F9FD"></div>
+            <div class="field"><label>Text color</label><input type="color" id="thText" value="#16213E"></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>Primary accent</label><input type="color" id="thPrimary" value="#0BAF77"></div>
+            <div class="field"><label>Secondary accent</label><input type="color" id="thSecondary" value="#E8940C"></div>
+          </div>
+          <div class="glass" id="themePreview" style="padding:18px;margin-bottom:14px;border-radius:var(--radius-md);">
+            <div style="font-weight:600;margin-bottom:10px;" id="previewName">Preview</div>
+            <div style="display:flex;gap:10px;margin-bottom:10px;">
+              <div style="padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;" id="previewPrimaryBtn">Primary</div>
+              <div style="padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;" id="previewSecondaryBtn">Secondary</div>
+            </div>
+            <p style="font-size:13px;line-height:1.5;" id="previewText">This is how your text will look on the background you picked.</p>
+          </div>
+          <div id="themeValidation" style="font-size:12px;margin-bottom:10px;"></div>
+          <button class="btn btn-primary btn-sm" onclick="submitTheme()">Send for approval</button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- FOOTER NAV -->
+    <nav class="footer">
+      <div class="footer-inner" id="footerNav"></div>
+    </nav>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- GAME OVERLAY (MVP's Throne, Codex Primus) -->
+<div class="game-overlay" id="gameOverlay" style="display:none;">
+  <div class="game-overlay-inner">
+    <div class="game-overlay-header">
+      <h3 id="gameOverlayTitle">Game</h3>
+      <button class="icon-btn" onclick="closeGameOverlay()" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    
+    <!-- MVP's Throne -->
+    <div id="thronePanel" class="game-panel" style="display:none;">
+      <div id="throneSetup" style="display:block;">
+        <div class="field"><label>Your pitch</label><textarea id="thPitch" placeholder="e.g. Build a color-guessing game in vanilla JS" style="min-height:70px;"></textarea></div>
+        <div class="field"><label>Deadline</label>
+          <select id="thDeadline" onchange="updateThroneDeadline()">
+            <option value="15">15 minutes</option>
+            <option value="30" selected>30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="120">2 hours</option>
+            <option value="240">4 hours</option>
+          </select>
+        </div>
+        <div class="field"><label>Custom deadline (minutes)</label><input type="number" id="thCustomDeadline" value="30" min="5" max="240" onchange="updateThroneDeadline()"></div>
+        <button class="btn btn-primary" onclick="startThrone()" style="width:100%;justify-content:center;">Claim the Throne</button>
+        <p style="font-size:11px;color:var(--muted-2);margin-top:10px;text-align:center;">One active attempt at a time. Strict 50-line limit applies on submit.</p>
+      </div>
+      <div id="throneActive" style="display:none;">
+        <div class="glass" style="padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:11px;color:var(--muted-2);">Pitch</div>
+            <div style="font-size:13px;font-weight:600;" id="thActivePitch">—</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px;color:var(--muted-2);">Time left</div>
+            <div class="mono" style="font-size:20px;font-weight:700;color:var(--gold);" id="thTimer">00:00</div>
+          </div>
+        </div>
+        <div class="field"><label>Paste your solution</label><textarea id="thCode" placeholder="Paste your code here..." style="min-height:200px;font-family:'JetBrains Mono',monospace;font-size:12px;"></textarea></div>
+        <div style="font-size:11px;color:var(--muted-2);margin-bottom:10px;" id="thLineCount">0 / 50 lines</div>
+        <button class="btn btn-primary" onclick="submitThrone()" style="width:100%;justify-content:center;">Submit</button>
+      </div>
+      <div id="throneResult" style="display:none;">
+        <div id="throneResultContent"></div>
+      </div>
+    </div>
+
+    <!-- Codex Primus -->
+    <div id="primusPanel" class="game-panel" style="display:none;">
+      <div class="primus-tabs" style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="chip active" id="primusTabAuthor" onclick="switchPrimusTab('author')">Create challenge</button>
+        <button class="chip" id="primusTabSolve" onclick="switchPrimusTab('solve')">Solve challenges</button>
+      </div>
+      <div id="primusAuthor" style="display:block;">
+        <div class="field"><label>Code snippet</label><textarea id="prCode" placeholder="Paste your code snippet here..." style="min-height:140px;font-family:'JetBrains Mono',monospace;font-size:12px;"></textarea></div>
+        <div class="field"><label>Answer key</label><textarea id="prAnswer" placeholder="Expected output or description of what it does" style="min-height:70px;"></textarea></div>
+        <div class="grid2">
+          <div class="field"><label>Time limit</label>
+            <select id="prTime">
+              <option value="30">30 seconds</option>
+              <option value="60" selected>1 minute</option>
+              <option value="120">2 minutes</option>
+              <option value="300">5 minutes</option>
+            </select>
+          </div>
+          <div class="field"><label>Difficulty</label>
+            <select id="prDiff">
+              <option value="">—</option>
+              <option value="Beginner">Beginner</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="Advanced">Advanced</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Visibility</label>
+          <select id="prVis">
+            <option value="public">Publish for anyone</option>
+            <option value="direct">Send directly</option>
+          </select>
+        </div>
+        <div class="field" id="prRecipientField" style="display:none;"><label>Recipient</label><input type="text" id="prRecipient" placeholder="Member name"></div>
+        <button class="btn btn-primary" onclick="createPrimusChallenge()" style="width:100%;justify-content:center;">Create Challenge</button>
+      </div>
+      <div id="primusSolve" style="display:none;">
+        <div id="primusChallengeList" style="display:block;">
+          <div id="primusChallengeListContent"></div>
+        </div>
+        <div id="primusSolveActive" style="display:none;">
+          <div class="glass" style="padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:11px;color:var(--muted-2);">Author</div>
+              <div style="font-size:13px;font-weight:600;" id="prAuthorName">—</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px;color:var(--muted-2);">Time left</div>
+              <div class="mono" style="font-size:20px;font-weight:700;color:var(--gold);" id="prTimer">00:00</div>
+            </div>
+          </div>
+          <div class="glass" style="padding:14px;margin-bottom:14px;background:var(--panel-strong);">
+            <pre id="prCodeReveal" style="font-family:'JetBrains Mono',monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto;"></pre>
+          </div>
+          <div class="field"><label>Your answer</label><textarea id="prAnswerInput" placeholder="What does this code do? What is the output?" style="min-height:80px;"></textarea></div>
+          <button class="btn btn-primary" onclick="submitPrimusAnswer()" style="width:100%;justify-content:center;">Submit Answer</button>
+          <p style="font-size:11px;color:var(--muted-2);margin-top:10px;text-align:center;">Answer auto-submits when time runs out.</p>
+        </div>
+        <div id="primusResult" style="display:none;">
+          <div id="primusResultContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AI CHAT OVERLAY -->
+<div class="game-overlay" id="aiChatOverlay" style="display:none;">
+  <div class="game-overlay-inner" style="max-width:480px;">
+    <div class="game-overlay-header">
+      <h3>AI Assistant</h3>
+      <button class="icon-btn" onclick="closeAIChat()" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="aiMessages" style="height:300px;overflow-y:auto;margin-bottom:14px;padding:4px;"></div>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="aiChatInput" placeholder="Ask anything..." style="flex:1;padding:12px 14px;border-radius:var(--radius-pill);border:1.5px solid var(--border-soft);background:rgba(22,33,62,0.035);color:var(--text);font-size:14px;outline:none;" onkeydown="if(event.key==='Enter')sendAIChat()">
+      <button class="btn btn-primary btn-sm" onclick="sendAIChat()">Send</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted-2);margin-top:8px;text-align:center;">Uses your saved API key. Set it in Settings if prompted.</p>
+  </div>
+</div>
+
+<!-- FIRST-TIME GUIDE -->
+<div class="guide-overlay" id="guideOverlay">
+  <div class="glass guide-card" id="guideCard"></div>
+</div>
+<script type="module" src="app.js"></script>
+<script>
+  if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+    window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+  }
+  window.addEventListener('error', function(e) {
+    console.error('Global error:', e.error);
+    const el = document.getElementById('onboardWrap');
+    if(el && el.querySelector('.ob-card')){
+      el.querySelector('.ob-card').innerHTML = '<h1 style="color:var(--coral)">Error loading app</h1><p style="color:var(--muted)">Check console for details: ' + (e.message || e.error?.message || 'unknown') + '</p>';
+    }
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    console.error('Unhandled rejection:', e.reason);
+    const el = document.getElementById('onboardWrap');
+    if(el && el.querySelector('.ob-card')){
+      el.querySelector('.ob-card').innerHTML = '<h1 style="color:var(--coral)">Error loading app</h1><p style="color:var(--muted)">Check console for details: ' + (e.reason?.message || e.reason || 'unknown') + '</p>';
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+*.log
+
+# Hosting deploy cache / local emulators
+.firebaserc.bak
+firestore-debug.log
+ui-debug.log
+
+# IDE / tool state
+.allai/
+
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Env / secrets (never commit real keys)
+.env
+.env.*
+service-account*.json

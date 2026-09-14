@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Junior Codex · Admin</title>
+<meta name="description" content="Junior Codex admin dashboard — manage members, events, uploads, and approvals.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="logo1.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="watermark"></div>
+
+<div class="banner" id="configBanner" style="display:none;max-width:520px;margin:16px auto 0;">
+  Firebase isn't connected yet — add your project keys to <code>firebase-config.js</code> to activate members, live data and uploads. The interface still works so you can preview it.
+</div>
+
+<!-- ================= AUTH GATE ================= -->
+<div class="onboard" id="authGate" style="display:none;">
+  <div class="ob-card">
+    <div class="brand-row"><div class="logo-mark" style="color:var(--gold)"><img src="logo.png" alt="Junior Codex"></div><div class="name">Junior Codex · Admin</div></div>
+    <div class="ob-eyebrow mono">&gt; sign in to manage the community<span class="cursor-blink">_</span></div>
+    <h1 style="font-size:26px;">Admin sign in</h1>
+    <p class="sub">Use the same email/password you signed up with on the member side — any signed-in member can currently open this page. Restrict it for real use with the Firestore rules in README.md.</p>
+    <div id="authError" class="banner" style="display:none;background:rgba(240,72,62,0.1);border-color:rgba(240,72,62,0.3);color:#a3291f;"></div>
+    <div class="field"><label>Email</label><input id="ga_email" type="email" placeholder="you@example.com"></div>
+    <div class="field"><label>Password</label><input id="ga_password" type="password" placeholder="••••••••"></div>
+    <button class="btn btn-primary" id="gateSigninBtn" style="width:100%;justify-content:center" onclick="handleGateSignIn()">Sign in</button>
+    <div class="inline-link" onclick="window.location.href='index.html'">Back to member app</div>
+  </div>
+</div>
+
+<!-- ================= ADMIN MAIN ================= -->
+<div id="adminMain" style="display:none;">
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo-mark" style="color:var(--gold)"><img src="logo.png" alt="Junior Codex"></div>
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14.5px;">Junior Codex · Admin</div>
+        <div style="font-size:10.5px;color:var(--muted-2)">Manage the community</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <a class="admin-toggle" href="index.html">Member view</a>
+      <button class="icon-btn" title="Sign out" onclick="handleSignOut()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      </button>
+    </div>
+  </header>
+  <main class="content" style="max-width:1000px;">
+    <div class="stat-grid">
+      <div class="glass stat-card"><div class="num mono" id="statUsers">0</div><div class="lbl">Total members</div></div>
+      <div class="glass stat-card"><div class="num mono" id="statTopPoints">0</div><div class="lbl">Top player points</div></div>
+      <div class="glass stat-card"><div class="num mono" id="statPending">0</div><div class="lbl">Pending review</div></div>
+      <div class="glass stat-card"><div class="num mono" id="statLiveEvents">0</div><div class="lbl">Live events</div></div>
+    </div>
+
+    <div class="tab-row">
+      <button class="chip active" data-atab="users" onclick="setAdminTab('users')">Members</button>
+      <button class="chip" data-atab="uploads" onclick="setAdminTab('uploads')">Uploads</button>
+      <button class="chip" data-atab="pending" onclick="setAdminTab('pending')">Pending themes &amp; games</button>
+      <button class="chip" data-atab="events" onclick="setAdminTab('events')">Post event</button>
+    </div>
+
+    <div id="admin-users" class="admin-tab">
+      <div class="glass" style="padding:6px;overflow-x:auto;">
+        <table class="admin-table">
+          <thead><tr><th>Name</th><th>Level</th><th>Interests</th><th>Points</th><th>Joined via</th><th></th></tr></thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="admin-uploads" class="admin-tab" style="display:none">
+      <div class="upload-grid">
+        <div class="glass upload-card">
+          <h4>Upload game</h4>
+          <div class="dropzone"><input type="file" id="fileGame"></div>
+          <div class="progress-bar"><div class="progress-fill" id="barGame"></div></div>
+          <div class="upload-status" id="statusGame"></div>
+          <button class="btn btn-sm" onclick="handleUpload('games','fileGame','statusGame','barGame')">Upload</button>
+        </div>
+        <div class="glass upload-card">
+          <h4>Upload event asset</h4>
+          <div class="dropzone"><input type="file" id="fileEvent" accept="image/*"></div>
+          <div class="progress-bar"><div class="progress-fill" id="barEvent"></div></div>
+          <div class="upload-status" id="statusEvent"></div>
+          <button class="btn btn-sm" onclick="handleUpload('events','fileEvent','statusEvent','barEvent')">Upload</button>
+        </div>
+        <div class="glass upload-card">
+          <h4>Upload theme</h4>
+          <div class="dropzone"><input type="file" id="fileTheme"></div>
+          <div class="progress-bar"><div class="progress-fill" id="barTheme"></div></div>
+          <div class="upload-status" id="statusTheme"></div>
+          <button class="btn btn-sm" onclick="handleUpload('themes','fileTheme','statusTheme','barTheme')">Upload</button>
+        </div>
+        <div class="glass upload-card">
+          <h4>Upload icon set</h4>
+          <div class="dropzone"><input type="file" id="fileIcons" accept="image/*"></div>
+          <div class="progress-bar"><div class="progress-fill" id="barIcons"></div></div>
+          <div class="upload-status" id="statusIcons"></div>
+          <button class="btn btn-sm" onclick="handleUpload('icons','fileIcons','statusIcons','barIcons')">Upload</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="admin-pending" class="admin-tab" style="display:none">
+      <div id="pendingList"></div>
+    </div>
+
+    <div id="admin-events" class="admin-tab" style="display:none">
+      <div class="glass" style="padding:22px;max-width:520px;">
+        <div class="grid2">
+          <div class="field"><label>Title</label><input type="text" placeholder="e.g. React Basics Workshop" id="evTitle"></div>
+          <div class="field"><label>Place</label><input type="text" placeholder="Accra Hub / Online" id="evPlace"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>Start date</label><input type="date" id="evStart"></div>
+          <div class="field"><label>Deadline</label><input type="date" id="evDeadline"></div>
+        </div>
+        <div class="field"><label>Link</label><input type="text" placeholder="https://..." id="evLink"></div>
+        <button class="btn btn-primary btn-sm" onclick="handlePostEvent()">Post to main body</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="admin.js"></script>
+</body>
+</html>
