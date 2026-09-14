@@ -19,6 +19,37 @@
     --radius-md: 16px 16px 16px 5px;
     --radius-sm: 12px 12px 12px 4px;
     --radius-pill: 999px;
+    --hero-grad: linear-gradient(135deg, #16213E 0%, #1F3A5F 45%, #0BAF77 100%);
+  }
+  /* ---- Curated first-party themes (Personalize presets, applied instantly) ---- */
+  body[data-theme="terminal-night"]{
+    --bg:#0B0F1A; --bg-2:#0E1424;
+    --panel: rgba(20,28,48,0.78); --panel-strong: rgba(20,28,48,0.94);
+    --border: rgba(45,225,167,0.22); --border-soft: rgba(45,225,167,0.12);
+    --text:#E6F1E9; --muted:#9FB8A8; --muted-2:#6E8579;
+    --mint:#2DE1A7; --mint-dim: rgba(45,225,167,0.14);
+    --gold:#E8940C; --gold-dim: rgba(232,148,12,0.16);
+    --coral:#FF6B6B;
+    --shadow: 0 10px 30px -14px rgba(0,0,0,0.6);
+    --shadow-sm: 0 6px 16px -10px rgba(0,0,0,0.5);
+    --hero-grad: linear-gradient(135deg, #05080F 0%, #0E2A22 60%, #2DE1A7 130%);
+  }
+  body[data-theme="sunrise-sprint"]{
+    --bg:#FFF8F0; --bg-2:#FFF1E2;
+    --mint:#FF6B4A; --mint-dim: rgba(255,107,74,0.13);
+    --gold:#F5A623; --gold-dim: rgba(245,166,35,0.16);
+    --hero-grad: linear-gradient(135deg, #FF6B4A 0%, #F5A623 60%, #FFC145 100%);
+  }
+  body[data-theme="blueprint"]{
+    --bg:#F4F7FE; --bg-2:#EAF0FD;
+    --mint:#2456D6; --mint-dim: rgba(36,86,214,0.12);
+    --hero-grad: linear-gradient(135deg, #1B3A6B 0%, #2456D6 55%, #5B8DEF 100%);
+  }
+  body[data-theme="mint-paper"]{
+    --bg:#F2FBF6; --bg-2:#E7F6EE;
+    --mint:#0BAF77; --mint-dim: rgba(11,175,119,0.13);
+    --gold:#FFC145;
+    --hero-grad: linear-gradient(135deg, #0BAF77 0%, #5BD6A4 60%, #FFC145 130%);
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{height:100%;}

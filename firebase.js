@@ -19,12 +19,10 @@ import {
 
 export const isConfigured = !!(firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith('YOUR_'));
 
-// Single-admin gate. A UID is required — admin.html only opens for that UID.
-// "PASTE_YOUR_UID_HERE" and "" both mean "not set yet": open testing mode so
-// you can sign up and grab your UID, then paste it and redeploy.
+// Single-admin gate. UID is set — only that account opens admin.html.
 export const ADMIN_UID_SET = !!(ADMIN_UID && ADMIN_UID.length > 10 && ADMIN_UID.indexOf('PASTE_') !== 0);
 export function isAdminUid(uid){
-  if(!ADMIN_UID_SET) return true; // open testing mode until the UID is set
+  if(!ADMIN_UID_SET) return false; // locked down: unknown UID never passes
   return uid === ADMIN_UID;
 }
 
@@ -55,6 +53,7 @@ const contributorsCol = db ? collection(db, 'contributors') : null;
 const themesCol = db ? collection(db, 'themes') : null;
 const pendingCol = db ? collection(db, 'pending') : null;
 const uploadsCol = db ? collection(db, 'uploads') : null;
+const reportsCol = db ? collection(db, 'reports') : null;
 const challengesCol = db ? collection(db, 'challenges') : null;
 const challengeAttemptsCol = db ? collection(db, 'challengeAttempts') : null;
 const throneAttemptsCol = db ? collection(db, 'throneAttempts') : null;
@@ -675,6 +674,34 @@ export function getThemesCol(){ return themesCol; }
 export function getPendingCol(){ return pendingCol; }
 export function getContributorsCol(){ return contributorsCol; }
 export function getNotificationsCol(){ return notificationsCol; }
+export function getReportsCol(){ return reportsCol; }
+
+/* ============ REPORTS (moderation — minors safety, admin-only reads) ============ */
+
+export async function flagContent({ targetType, targetId, targetText, reason, reporterUid, reporterName }){
+  await addDoc(reportsCol, {
+    targetType, targetId,
+    targetText: (targetText || '').slice(0, 500),
+    reason: reason || 'inappropriate',
+    reporterUid, reporterName: reporterName || 'Member',
+    status: 'open', createdAt: serverTimestamp()
+  });
+}
+
+export function onReports(callback, onError){
+  const q = query(reportsCol, orderBy('createdAt', 'desc'), limit(100));
+  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => { console.error('onReports:', err); onError && onError(err); });
+}
+
+export async function resolveReport(id, action, targetType, targetId){
+  if(action === 'remove' && targetId){
+    try{
+      const col = targetType === 'suggestion' ? suggestionsCol : targetType === 'message' ? null : null;
+      if(col) await deleteDoc(doc(col, targetId));
+    } catch(e){ console.warn('[reports] remove failed:', e); }
+  }
+  await updateDoc(doc(reportsCol, id), { status: action === 'remove' ? 'removed' : 'dismissed', resolvedAt: serverTimestamp() });
+}
 
 /* ============ NOTIFICATIONS ============ */
 

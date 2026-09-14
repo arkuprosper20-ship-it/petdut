@@ -2,7 +2,7 @@
 import {
   isConfigured, signUpMember, signInMember, watchAuth, signOutMember, getProfile, updateProfile, addPoints,
   onEvents, onGameRooms, hostGameRoom, joinGameRoom, onLeaderboard,
-  onSuggestions, addSuggestion, reactToSuggestion,
+  onSuggestions, addSuggestion, reactToSuggestion, flagContent,
   onMyChats, onMessages, sendMessage, openOrCreateChat, searchUsers, blockUser,
   onContributors, onApprovedThemes, submitPending, seedIfEmpty,
   validateTheme, submitThemeValidated, contrastRatio,
@@ -13,7 +13,7 @@ import {
   getChallengesCol, getChallengeAttemptsCol, getThroneAttemptsCol, getThemesCol, getPendingCol, getContributorsCol,
   createNotification, onMyNotifications, markNotificationRead, markAllNotificationsRead, broadcastChatNotification
 } from './firebase.js';
-import { AVATARS, GAMES } from './data.js';
+import { AVATARS, GAMES, BUILT_IN_THEMES } from './data.js';
 
 /* ============ STATE ============ */
 const state = {
@@ -596,6 +596,82 @@ async function submitTheme(){
   }
 }
 
+/* ============ HACKUP (real build game: template + editor + code check) ============ */
+const HACKUP_STARTERS = {
+  card: '<!DOCTYPE html>\n<html>\n<head>\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<style>\n  body { font-family: sans-serif; background: #F6F9FD; color: #16213E; margin: 0; padding: 24px; }\n  .card { background: #fff; border-radius: 12px; padding: 24px; max-width: 420px; margin: 0 auto; }\n  h1 { margin: 0 0 8px; }\n  @media (max-width: 600px) { body { padding: 12px; } }\n</style>\n</head>\n<body>\n  <div class="card">\n    <h1>Ama Serwaa</h1>\n    <p>Young coder · Accra · HTML/CSS</p>\n  </div>\n</body>\n</html>',
+  poster: '<!DOCTYPE html>\n<html>\n<head>\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<style>\n  body { font-family: sans-serif; background: #FFF8F0; color: #3A2A1A; margin: 0; padding: 24px; text-align: center; }\n  .hero { background: #FF6B4A; color: #fff; border-radius: 12px; padding: 32px 16px; }\n  @media (max-width: 600px) { body { padding: 12px; } }\n</style>\n</head>\n<body>\n  <div class="hero">\n    <h1>Code & Chill Meetup</h1>\n    <p>Saturday · Accra Hub · Free entry</p>\n  </div>\n</body>\n</html>',
+  quiz: '<!DOCTYPE html>\n<html>\n<head>\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<style>\n  body { font-family: sans-serif; background: #F2FBF6; color: #22352C; margin: 0; padding: 24px; }\n  button { background: #0BAF77; color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; }\n  @media (max-width: 600px) { body { padding: 12px; } }\n</style>\n</head>\n<body>\n  <h1>Mini Quiz</h1>\n  <p>What does HTML stand for?</p>\n  <button onclick="check()">HyperText Markup Language</button>\n  <p id="out"></p>\n  <script>\n    function check(){ document.getElementById("out").textContent = "Correct!"; }\n  <\/script>\n</body>\n</html>'
+};
+function hackupCheck(code, bg, text){
+  const checks = [];
+  // 1. balanced tags (ignores void elements + script/style contents)
+  const stripped = code.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
+  const voids = new Set(['meta','link','br','hr','img','input','area','base','col','embed','source','track','wbr']);
+  const stack = []; let balanced = true;
+  const tagRe = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*?>/g; let m;
+  while((m = tagRe.exec(stripped))){
+    const full = m[0], name = m[1].toLowerCase();
+    if(full.endsWith('/>') || voids.has(name)) continue;
+    if(full.startsWith('</')){ if(stack.pop() !== name){ balanced = false; break; } }
+    else if(!full.startsWith('<!')) stack.push(name);
+  }
+  if(stack.length) balanced = false;
+  checks.push({ id:'tags', label:'No broken HTML tags', pass: balanced && /<\s*html/i.test(code) });
+  // 2. responsive: needs a viewport meta or a media query
+  checks.push({ id:'responsive', label:'Responsive (viewport meta or @media rule)', pass: /name=["']viewport["']/i.test(code) || /@media/i.test(code) });
+  // 3. contrast: picked theme colors must be readable
+  let ratio = 0;
+  try{ ratio = contrastRatio(text, bg); } catch(e){ ratio = 0; }
+  checks.push({ id:'contrast', label:'Text readable on background (contrast 4.5:1, now ' + ratio.toFixed(1) + ':1)', pass: ratio >= 4.5 });
+  return { checks, pass: checks.every(c => c.pass) };
+}
+function renderHackupChecklist(result){
+  document.getElementById('hkChecklist').innerHTML = result.checks.map(c =>
+    '<div style="padding:6px 0;color:' + (c.pass ? 'var(--mint)' : 'var(--coral)') + ';">' + (c.pass ? '✓' : '✗') + ' ' + c.label + '</div>'
+  ).join('');
+}
+function insertHackupStarter(){
+  const t = document.getElementById('hkTemplate').value;
+  document.getElementById('hkCode').value = HACKUP_STARTERS[t] || HACKUP_STARTERS.card;
+  document.getElementById('hkChecklist').innerHTML = '';
+}
+function previewHackup(){
+  const code = document.getElementById('hkCode').value;
+  if(!code.trim()){ showToast('Write some code first'); return; }
+  document.getElementById('hkPreviewWrap').style.display = 'block';
+  document.getElementById('hkPreview').srcdoc = code;
+}
+function runHackupCheck(){
+  const code = document.getElementById('hkCode').value;
+  if(!code.trim()){ showToast('Write some code first'); return; }
+  const result = hackupCheck(code, document.getElementById('hkBg').value, document.getElementById('hkText').value);
+  renderHackupChecklist(result);
+  showToast(result.pass ? 'All checks pass — submit it!' : 'Fix the ✗ items above');
+  return result.pass;
+}
+async function submitHackup(){
+  if(!requireFirebase()) return;
+  if(!runHackupCheck()) return;
+  const name = document.getElementById('hkThemeName').value.trim();
+  if(!name){ showToast('Give your theme a name first'); return; }
+  const colors = { bg: document.getElementById('hkBg').value, text: document.getElementById('hkText').value, primaryAccent: '#0BAF77', secondaryAccent: '#E8940C' };
+  const code = document.getElementById('hkCode').value;
+  const userName = state.form.name || state.profile?.name || 'Member';
+  const result = await submitThemeValidated(name, colors, state.uid, userName);
+  if(!result.submitted){
+    showToast(result.errors[0] || 'Theme check failed');
+    return;
+  }
+  try{
+    await submitPending('hackup-build', state.uid, userName, name, code.slice(0, 900) + (code.length > 900 ? '… (truncated)' : ''), { colors: [colors.bg, colors.text, colors.primaryAccent, colors.secondaryAccent] });
+  } catch(e){ /* theme already queued above — build record is best-effort */ }
+  document.getElementById('hkCode').value = '';
+  document.getElementById('hkThemeName').value = '';
+  document.getElementById('hkChecklist').innerHTML = '';
+  document.getElementById('hkPreviewWrap').style.display = 'none';
+  showToast('Build submitted — admin reviews it');
+}
+
 /* ============ MVP'S THRONE ============ */
 
 function openGameOverlay(game){
@@ -603,8 +679,14 @@ function openGameOverlay(game){
   document.getElementById('gameOverlay').style.display = 'block';
   document.getElementById('thronePanel').style.display = 'none';
   document.getElementById('primusPanel').style.display = 'none';
-  
-  if(game === "MVP's Throne"){
+  const hk = document.getElementById('hackupPanel');
+  if(hk) hk.style.display = 'none';
+
+  if(game === 'Hackup'){
+    if(hk) hk.style.display = 'block';
+    document.getElementById('gameOverlayTitle').textContent = 'Hackup';
+    if(!document.getElementById('hkCode').value) insertHackupStarter();
+  } else if(game === "MVP's Throne"){
     document.getElementById('thronePanel').style.display = 'block';
     document.getElementById('gameOverlayTitle').textContent = "MVP's Throne";
     renderThroneSetup();
@@ -986,19 +1068,30 @@ function setSort(mode){
   document.getElementById('sortPopular')?.classList.toggle('active', mode==='popular');
   renderGames();
 }
+function setLevelFilter(level){
+  state.gameLevelFilter = level;
+  document.querySelectorAll('[data-levelfilter]').forEach(b=>b.classList.toggle('active', b.dataset.levelfilter===level));
+  renderGames();
+}
 function renderGames(){
-  document.getElementById('gameGrid').innerHTML = GAMES.map(g=>`
+  const myLevel = state.profile?.level || state.form.written === 'lots' ? 'Advanced' : state.form.written === 'some' ? 'Intermediate' : '';
+  const grid = document.getElementById('gameGrid');
+  grid.innerHTML = GAMES.map(g=>{
+    const match = !myLevel || !state.gameLevelFilter || state.gameLevelFilter === 'All' || g.level === state.gameLevelFilter;
+    if(!match) return '';
+    return `
     <div class="glass game-card">
       <div class="g-icon">${g.icon}</div>
       <h4>${g.name}</h4>
       <p>${g.desc}</p>
-      <div class="game-meta"><span class="mono">${g.type}</span></div>
+      <div class="game-meta"><span class="mono">${g.type}</span><span class="lb-tag" title="Suggested level">${g.level}</span>${myLevel && g.level === myLevel ? '<span class="lb-tag" style="background:var(--mint-dim);color:var(--mint);">For you</span>' : ''}</div>
+      <div class="howto" style="font-size:12px;color:var(--muted);line-height:1.55;margin:8px 0;padding:10px 12px;background:rgba(22,33,62,.04);border-radius:10px;"><b style="color:var(--text);">How to play:</b> ${g.how}<br><b style="color:var(--text);">Win:</b> ${g.win}</div>
       <div class="game-actions">
         <button class="btn btn-primary btn-sm" onclick="openGameOverlay('${g.name}')">Play</button>
-        <button class="btn btn-sm" onclick="showToast('Looking for a room...')">Join</button>
-        <button class="btn btn-sm btn-ghost" title="Demo: earn points" onclick="winGame('${g.name}')">+5 pts</button>
+        <button class="btn btn-sm" onclick="hostGame('${g.name}')">Host room</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 async function hostGame(name){
   if(!requireFirebase()) return;
@@ -1056,10 +1149,26 @@ function renderSuggestions(list){
         <div class="when">${s.createdAt?.toDate ? timeAgo(s.createdAt.toDate()) : 'just now'}</div>
       </div>
       <div class="sug-text">${s.text}</div>
-      <div class="reactions">
+      <div class="reactions" style="display:flex;align-items:center;gap:6px;">
         ${['🔥','💡','👏'].map(e=>`<button class="react-btn" onclick="react('${s.id}','${e}')">${e} ${s.reactions?.[e]||''}</button>`).join('')}
+        <button class="react-btn" title="Report to admin" style="margin-left:auto;opacity:.55;" onclick="reportSuggestion('${s.id}')">🚩</button>
       </div>
-    </div>`).join('') || `<div class="empty"><div class="em-icon">💡</div>No suggestions yet — add the first one</div>`;
+    </div>`).join('') || `<div class="empty"><div class="em-icon">💡</div><div><b>No ideas yet — be the first to light one up.</b><br><span style="font-size:12px;">Suggest a game, an event, or anything that would make this community better.</span></div></div>`;
+}
+
+async function reportSuggestion(id){
+  if(!requireFirebase()) return;
+  const reason = prompt('Report this suggestion to the admin — what is wrong?\n(inappropriate / spam / bullying / other)', 'inappropriate');
+  if(reason === null) return;
+  const card = state.sugCache?.find(s => s.id === id);
+  try{
+    await flagContent({
+      targetType: 'suggestion', targetId: id,
+      targetText: card?.text || '', reason: (reason || 'inappropriate').slice(0, 120),
+      reporterUid: state.uid, reporterName: state.form.name || state.profile?.name || 'Member'
+    });
+    showToast('Reported — the admin will review it');
+  } catch(e){ showToast('Could not send the report — try again'); }
 }
 
 /* ============ CHAT ============ */
@@ -1125,9 +1234,24 @@ function closeThread(){
 function renderMessages(messages){
   const wrap = document.getElementById('threadMessages');
   wrap.innerHTML = messages.map(m => `
-    <div class="msg-bubble ${m.from===state.uid?'mine':'theirs'}">${m.text}</div>
-  `).join('') || `<div class="empty-msgs">Say hi 👋</div>`;
+    <div class="msg-bubble ${m.from===state.uid?'mine':'theirs'}" ${m.from!==state.uid?`title="Long-press to report" oncontextmenu="event.preventDefault();reportMessage('${m.id}')"`
+:''}>${m.text}</div>
+  `).join('') || `<div class="empty-msgs">Say hi 👋 — be kind, you're talking to a fellow young coder.</div>`;
   wrap.scrollTop = wrap.scrollHeight;
+}
+
+async function reportMessage(msgId){
+  if(!requireFirebase()) return;
+  const reason = prompt('Report this message to the admin — what is wrong?\n(bullying / inappropriate / spam / other)', 'bullying');
+  if(reason === null) return;
+  try{
+    await flagContent({
+      targetType: 'message', targetId: state.activeChatId + '/' + msgId,
+      targetText: '', reason: (reason || 'bullying').slice(0, 120),
+      reporterUid: state.uid, reporterName: state.form.name || state.profile?.name || 'Member'
+    });
+    showToast('Reported — the admin will review it');
+  } catch(e){ showToast('Could not send the report — try again'); }
 }
 async function sendThreadMessage(){
   if(!requireFirebase()) return;

@@ -115,11 +115,13 @@
 
       <!-- GAMES -->
       <section class="page" id="page-games">
-        <div class="page-head"><h2>Games</h2><p>Hack, host, and climb the leaderboard</p></div>
+        <div class="page-head"><h2>Games</h2><p>Hack, host, and climb the leaderboard — every game shows how to play and how to win</p></div>
         <div class="games-toolbar">
           <div class="sort-toggle">
-            <button class="chip active" id="sortPlayed" onclick="setSort('played')">Most played</button>
-            <button class="chip" id="sortPopular" onclick="setSort('popular')">Popular</button>
+            <button class="chip" data-levelfilter="All" onclick="setLevelFilter('All')">All levels</button>
+            <button class="chip" data-levelfilter="Beginner" onclick="setLevelFilter('Beginner')">Beginner</button>
+            <button class="chip" data-levelfilter="Intermediate" onclick="setLevelFilter('Intermediate')">Intermediate</button>
+            <button class="chip" data-levelfilter="Advanced" onclick="setLevelFilter('Advanced')">Advanced</button>
           </div>
           <button class="btn btn-sm" onclick="toggleProposeGame()"> Propose a game</button>
         </div>
@@ -279,6 +281,35 @@
       </button>
     </div>
     
+    <!-- Hackup: real build game -->
+    <div id="hackupPanel" class="game-panel" style="display:none;">
+      <div class="field"><label>Starter template</label>
+        <select id="hkTemplate">
+          <option value="card">Personal Card — a one-page profile</option>
+          <option value="poster">Event Poster — a promo page for a meetup</option>
+          <option value="quiz">Mini Quiz — 3 questions, JS-scored</option>
+        </select>
+      </div>
+      <div class="field"><label>Your code (HTML + CSS + JS in one file)</label><textarea id="hkCode" placeholder="Write a full page here… try the Insert starter button" style="min-height:220px;font-family:'JetBrains Mono',monospace;font-size:12px;"></textarea></div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <button class="btn btn-sm" onclick="insertHackupStarter()">Insert starter</button>
+        <button class="btn btn-sm" onclick="previewHackup()">Preview</button>
+        <button class="btn btn-sm btn-primary" onclick="runHackupCheck()">Run check</button>
+      </div>
+      <div id="hkChecklist" style="font-size:12.5px;margin-bottom:10px;"></div>
+      <div class="glass" id="hkPreviewWrap" style="display:none;padding:12px;margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--muted-2);margin-bottom:8px;">PREVIEW</div>
+        <iframe id="hkPreview" title="Hackup preview" style="width:100%;height:220px;border:1px solid var(--border-soft);border-radius:8px;background:#fff;"></iframe>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Background</label><input type="color" id="hkBg" value="#F6F9FD"></div>
+        <div class="field"><label>Text color</label><input type="color" id="hkText" value="#16213E"></div>
+      </div>
+      <div class="field"><label>Theme name</label><input type="text" id="hkThemeName" placeholder="e.g. Mint Paper"></div>
+      <button class="btn btn-primary" onclick="submitHackup()" style="width:100%;justify-content:center;">Submit build + theme</button>
+      <p style="font-size:11px;color:var(--muted-2);margin-top:10px;text-align:center;">Pass all 3 checks, then submit. Admin approves → +5 pts + Contributor credit.</p>
+    </div>
+
     <!-- MVP's Throne -->
     <div id="thronePanel" class="game-panel" style="display:none;">
       <div id="throneSetup" style="display:block;">

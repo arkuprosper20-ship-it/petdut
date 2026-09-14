@@ -1,9 +1,9 @@
 // ============================================================
 // Junior Codex — Firebase project config (ADMIN LOCKED)
 // ============================================================
-// SINGLE ADMIN — this UID is the ONLY account that can open admin.html
-// and approve/post. Everyone else is bounced back to index.html, and the
-// Firestore rules below enforce the same gate server-side.
+// SINGLE ADMIN (2K4mB8Fw3oZJMSwB2PiozJy8Ycp2) — the ONLY account that can
+// open admin.html and approve/post. Everyone else is bounced to index.html,
+// and the Firestore rules enforce the same gate server-side.
 // To rotate admin: replace the UID here AND in firestore.rules, redeploy.
 // ============================================================
 
@@ -22,10 +22,6 @@ export const firebaseConfig = {
 // Firestore security rules, not by hiding these values.
 
 
-// SINGLE ADMIN — paste YOUR Firebase Auth UID between the quotes when you
-// have it (sign up on the live site first, then copy the UID from the
-// Firebase console → Authentication → Users, or from the member app's
-// Settings page which now shows it). While this is "" (empty), any
-// signed-in member can open admin.html so you can test end-to-end — but
-//Firestore rules below already require this UID for admin writes.
-export const ADMIN_UID = "PASTE_YOUR_UID_HERE";
+// SINGLE ADMIN — UID verified. Do not change without also updating
+// firestore.rules isAdmin().
+export const ADMIN_UID = "2K4mB8Fw3oZJMSwB2PiozJy8Ycp2";
