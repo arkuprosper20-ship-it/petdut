@@ -349,6 +349,21 @@ async function completeSignUp(){
     state.profile = profile;
     await enterApp();
   } catch(e){
+    // Auth account was created but the Firestore profile write was blocked:
+    // the user CAN sign in — let them straight in and backfill the profile
+    // via signInMember instead of stranding them on this screen.
+    if(e && e.uid && String(e.message || '').indexOf('PROFILE_WRITE_FAILED') === 0){
+      showToast('Account created — finishing setup…');
+      try{
+        const profile = await signInMember((state.form.email || '').trim(), state.form.password);
+        state.uid = profile.uid; state.profile = profile;
+      } catch(_){
+        state.uid = e.uid;
+        state.profile = { uid: e.uid, ...(e.profile || {}), name: state.form.name || 'Coder' };
+      }
+      await enterApp();
+      return;
+    }
     err.textContent = friendlyAuthError(e);
     err.style.display = 'block';
     btn.disabled = false; btn.textContent = 'Enter Junior Codex';
@@ -374,6 +389,7 @@ async function enterApp(){
   buildFooter();
   goPage('home');
   buildAvatarPicker();
+  showSkeletons();
 
   if(!isConfigured){
     renderHome([]); renderLeaderboard([]); renderSuggestions([]); renderContrib([]); renderThemes([]);
@@ -383,22 +399,40 @@ async function enterApp(){
     return;
   }
 
-  try{ await seedIfEmpty(); } catch(e){ /* best-effort */ }
+  try{ await seedIfEmpty(); } catch(e){ console.warn('[seed]', e); }
   try{ await expireThroneAttempts(); } catch(e){ /* best-effort */ }
 
-  state.unsub.events = onEvents(renderHome);
-  state.unsub.leaderboard = onLeaderboard(renderLeaderboard);
-  state.unsub.suggestions = onSuggestions(renderSuggestions);
-  state.unsub.chats = onMyChats(state.uid, chats => {
-    state.chatCache = chats;
-    if(state.page==='chat' && !state.activeChatId) renderChatList();
-  });
-  state.unsub.contrib = onContributors(renderContrib);
-  state.unsub.themes = onApprovedThemes(renderThemes);
+  // Wrap every listener: a single Firestore failure (rules/index/offline)
+  // must never leave the whole app on skeleton screens.
+  const safe = (name, sub) => {
+    try{ return sub(); }
+    catch(e){ console.error('[listen:' + name + ']', e); return null; }
+  };
+  state.unsub.events = safe('events', () => onEvents(renderHome, () => renderHome([])));
+  state.unsub.leaderboard = safe('leaderboard', () => onLeaderboard(renderLeaderboard, () => renderLeaderboard([])));
+  state.unsub.suggestions = safe('suggestions', () => onSuggestions(renderSuggestions, () => renderSuggestions([])));
+  try{
+    state.unsub.chats = onMyChats(state.uid, chats => {
+      state.chatCache = chats;
+      if(state.page==='chat' && !state.activeChatId) renderChatList();
+    }, () => { state.chatCache = []; if(state.page==='chat' && !state.activeChatId) renderChatList(); });
+  } catch(e){ console.error('[listen:chats]', e); }
+  try{ state.unsub.contrib = onContributors(renderContrib, () => renderContrib([])); }
+  catch(e){ console.error('[listen:contrib]', e); renderContrib([]); }
+  try{ state.unsub.themes = onApprovedThemes(renderThemes, () => renderThemes(BUILT_IN_THEMES)); }
+  catch(e){ console.error('[listen:themes]', e); renderThemes(BUILT_IN_THEMES); }
   startNotificationListener();
 
   renderGames();
   setTimeout(openGuide, 500);
+}
+
+function showSkeletons(){
+  const sk = (rows) => Array.from({length: rows}).map(()=>'<div class="skel"></div>').join('');
+  const set = (id, rows) => { const el = document.getElementById(id); if(el) el.innerHTML = sk(rows); };
+  set('row-new', 3); set('row-ongoing', 3); set('row-past', 3);
+  set('leaderboard', 3); set('sugList', 3); set('contribList', 3);
+  set('themeGrid', 4); set('chatList', 3);
 }
 
 /* ============ FOOTER NAV ============ */

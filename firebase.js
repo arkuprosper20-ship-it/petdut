@@ -66,13 +66,27 @@ export async function signUpMember(email, password, profile){
   const uid = cred.user.uid;
   const userDoc = {
     ...profile,
+    email: email,
     points: 0,
     level: profile.written === 'lots' ? 'Advanced' : profile.written === 'some' ? 'Intermediate' : 'Beginner',
     tag: null,
     blocked: [],
     createdAt: serverTimestamp()
   };
-  await setDoc(doc(usersCol, uid), userDoc);
+  try{
+    await setDoc(doc(usersCol, uid), userDoc);
+  } catch(e){
+    // Auth account EXISTS now — only the Firestore profile write failed
+    // (almost always a firestore.rules mismatch on /users/{uid}). Throw a
+    // marked error so completeSignUp() can tell the user "account created,
+    // sign in" instead of a generic failure.
+    console.error('[auth] profile write after sign-up failed:', e);
+    const marked = new Error('PROFILE_WRITE_FAILED: ' + (e && e.message ? e.message : e));
+    marked.code = (e && e.code) || 'permission-denied';
+    marked.uid = uid;
+    marked.profile = userDoc;
+    throw marked;
+  }
   return { uid, ...userDoc };
 }
 
@@ -177,9 +191,10 @@ export function onLeaderboard(callback, onError){
 
 /* ============ SUGGESTIONS ============ */
 
-export function onSuggestions(callback){
+export function onSuggestions(callback, onError){
   const q = query(suggestionsCol, orderBy('createdAt', 'desc'), limit(30));
-  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    err => { console.error('onSuggestions:', err); onError && onError(err); });
 }
 
 export async function addSuggestion(uid, who, text){
@@ -210,9 +225,10 @@ export async function openOrCreateChat(uidA, nameA, uidB, nameB){
   return id;
 }
 
-export function onMyChats(uid, callback){
+export function onMyChats(uid, callback, onError){
   const q = query(chatsCol, where('participants', 'array-contains', uid), orderBy('updatedAt', 'desc'));
-  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    err => { console.error('onMyChats:', err); onError && onError(err); });
 }
 
 export function onMessages(chatId, callback){
@@ -242,16 +258,22 @@ export async function searchUsers(term, excludeUid){
 
 /* ============ CONTRIBUTORS ============ */
 
-export function onContributors(callback){
+export function onContributors(callback, onError){
   const q = query(contributorsCol, orderBy('createdAt', 'desc'));
-  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    err => { console.error('onContributors:', err); onError && onError(err); });
 }
 
 /* ============ THEMES ============ */
 
-export function onApprovedThemes(callback){
+export function onApprovedThemes(callback, onError){
   const q = query(themesCol, where('status', '==', 'approved'));
-  return onSnapshot(q, snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  return onSnapshot(q, snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      items.sort((a, b) => toMillis(b.createdAt, 0) - toMillis(a.createdAt, 0));
+      callback(items);
+    },
+    err => { console.error('onApprovedThemes:', err); onError && onError(err); });
 }
 
 /* ============ PENDING (theme / game submissions for admin review) ============ */
@@ -603,6 +625,10 @@ export async function seedIfEmpty(){
   const existing = await getDocs(query(eventsCol, limit(1)));
   if(!existing.empty) return false;
 
+  // Only the admin account may seed (rules: events/themes writes = isAdmin).
+  // Everyone else silently skips so sign-up never hits permission-denied.
+  if(!(auth?.currentUser && isAdminUid(auth.currentUser.uid))) return false;
+
   const batch = writeBatch(db);
   const now = Date.now();
   const day = 86400000;
@@ -619,7 +645,11 @@ export async function seedIfEmpty(){
     title: 'Welcome Meetup', place: 'Kumasi Hub', img: '👋', link: '',
     startsAt: new Date(now - 20 * day), deadline: new Date(now - 18 * day), createdAt: serverTimestamp()
   });
-  batch.set(doc(themesCol), { name: 'Sunset Hack', colors: ['#241026', '#FF6B6B', '#FFC145'], status: 'approved', submittedBy: 'Kwesi B.', createdAt: serverTimestamp() });
+  // First-party Personalize presets — live on day one, no approval needed.
+  batch.set(doc(themesCol), { name: 'Terminal Night', colors: ['#0A0F1E', '#C8F7D4', '#34D399', '#7C6CFF'], status: 'approved', submittedBy: 'Junior Codex', desc: 'Deep-navy hacker preset for late-night builds.', createdAt: serverTimestamp() });
+  batch.set(doc(themesCol), { name: 'Sunrise Sprint', colors: ['#FFF8F0', '#3A2E2A', '#FF6B4A', '#FFB020'], status: 'approved', submittedBy: 'Junior Codex', desc: 'Warm, energetic preset for younger builders.', createdAt: serverTimestamp() });
+  batch.set(doc(themesCol), { name: 'Blueprint', colors: ['#FFFFFF', '#14324F', '#1B6FD6', '#FF8A00'], status: 'approved', submittedBy: 'Junior Codex', desc: 'Engineering-grid preset that leans into learning to build.', createdAt: serverTimestamp() });
+  batch.set(doc(themesCol), { name: 'Mint Paper', colors: ['#F3FBF5', '#234036', '#0BAF77', '#7C6CFF'], status: 'approved', submittedBy: 'Junior Codex', desc: 'Soft pastel preset — gentle and approachable.', createdAt: serverTimestamp() });
   batch.set(doc(contributorsCol), { name: 'Nadia F.', desc: 'Built the "Confetti Win" animation now used across all three games.', createdAt: serverTimestamp() });
 
   await batch.commit();
