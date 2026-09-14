@@ -16,30 +16,34 @@ import {
   deleteDoc, onSnapshot, query, orderBy, where, limit, serverTimestamp,
   increment, arrayUnion, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import {
-  getStorage, ref, uploadBytesResumable, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
 export const isConfigured = !!(firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith('YOUR_'));
 
-// Single-admin gate. Empty ADMIN_UID = open testing mode (any member can use
-// admin.html). Non-empty = only that UID passes isAdmin().
-export const ADMIN_UID_SET = !!(ADMIN_UID && ADMIN_UID.length > 10);
-export function isAdminUid(uid){ return ADMIN_UID_SET && uid === ADMIN_UID; }
+// Single-admin gate. A UID is required — admin.html only opens for that UID.
+// "PASTE_YOUR_UID_HERE" and "" both mean "not set yet": open testing mode so
+// you can sign up and grab your UID, then paste it and redeploy.
+export const ADMIN_UID_SET = !!(ADMIN_UID && ADMIN_UID.length > 10 && ADMIN_UID.indexOf('PASTE_') !== 0);
+export function isAdminUid(uid){
+  if(!ADMIN_UID_SET) return true; // open testing mode until the UID is set
+  return uid === ADMIN_UID;
+}
 
-let _app, _auth, _db, _storage;
+let _app, _auth, _db;
 try{
   _app = initializeApp(firebaseConfig);
   _auth = getAuth(_app);
   _db = getFirestore(_app);
-  _storage = getStorage(_app);
 } catch(e){
   console.warn('Firebase did not initialize — check firebase-config.js', e);
 }
 export const app = _app;
 export const auth = _auth;
 export const db = _db;
-export const storage = _storage;
+// NOTE: Firebase Storage was removed on purpose — the project uses the free
+// Spark plan only (Auth + Firestore + Hosting). File uploads below are stored
+// as compressed data-URLs inside Firestore (`uploads` collection), so there is
+// no Storage bucket, no Storage bill, and no storage.rules to deploy.
+export const storage = null;
 export { doc, getDoc, updateDoc, setDoc, deleteDoc, query, where, orderBy, limit, serverTimestamp, increment, arrayUnion, writeBatch, collection };
 
 const usersCol = db ? collection(db, 'users') : null;
@@ -76,8 +80,28 @@ export async function signUpMember(email, password, profile){
 export async function signInMember(email, password){
   const cred = await signInWithEmailAndPassword(auth, email, password);
   const uid = cred.user.uid;
-  const snap = await getDoc(doc(usersCol, uid));
-  return { uid, ...(snap.exists() ? snap.data() : {}) };
+  let snap = null;
+  try{
+    snap = await getDoc(doc(usersCol, uid));
+    if(snap && snap.exists()) return { uid, ...snap.data() };
+  } catch(e){
+    // Firestore read blocked (e.g. rules) — still let them in; the profile
+    // loads lazily via watchAuth/enterApp instead of failing sign-in outright.
+    console.warn('[auth] profile read after sign-in failed:', e);
+    return { uid, email: cred.user.email, name: 'Coder' };
+  }
+  // Auth account exists but has no Firestore profile (created in the console,
+  // or an older partial sign-up) — backfill a minimal one so the app never
+  // lands on a broken null-profile state.
+  const minimal = {
+    name: ((cred.user.email || 'Coder').split('@'))[0],
+    email: cred.user.email || '', points: 0, level: 'Beginner',
+    interests: [], tag: null, blocked: [], createdAt: serverTimestamp()
+  };
+  try{ await setDoc(doc(usersCol, uid), minimal, { merge: true }); } catch(e){
+    console.warn('[auth] profile backfill after sign-in failed:', e);
+  }
+  return { uid, ...minimal };
 }
 
 export function watchAuth(callback){
@@ -279,21 +303,68 @@ export function onAllUsers(callback){
   return onSnapshot(q, snap => callback(snap.docs.map(d => ({ uid: d.id, ...d.data() }))));
 }
 
-/* ============ UPLOADS (Storage) — games, events, themes, icon sets ============ */
+/* ============ UPLOADS (no Storage — free plan only) ============ */
+// Uploads are stored as compressed data-URLs in the `uploads` Firestore
+// collection. Limits: images are downscaled to max 640px / JPEG 0.7 and
+// capped at ~700KB (Firestore doc limit is 1MB); non-images capped at ~700KB
+// raw. Returns the data-URL (or text) so callers can render instantly.
 
 export function uploadAsset(category, file, onProgress){
   return new Promise((resolve, reject) => {
-    const path = `${category}/${Date.now()}_${file.name}`;
-    const task = uploadBytesResumable(ref(storage, path), file);
-    task.on('state_changed',
-      snap => onProgress && onProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-      err => reject(err),
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        await addDoc(uploadsCol, { category, name: file.name, url, createdAt: serverTimestamp() });
+    onProgress && onProgress(5);
+    const done = async (url, extra) => {
+      try{
+        await addDoc(uploadsCol, {
+          category, name: file.name, url,
+          size: file.size || null, type: file.type || null,
+          uploadedBy: auth?.currentUser?.uid || null,
+          createdAt: serverTimestamp(), ...(extra || {})
+        });
+        onProgress && onProgress(100);
         resolve(url);
+      } catch(e){ reject(e); }
+    };
+    if(file.type && file.type.startsWith('image/')){
+      downscaleImage(file, 640, 0.7).then(dataUrl => {
+        onProgress && onProgress(60);
+        if(dataUrl.length > 750000){
+          reject(new Error('Image is still over ~700KB after compression — try a smaller image.'));
+          return;
+        }
+        done(dataUrl, { dataUrl: true });
+      }).catch(reject);
+    } else {
+      if(file.size > 700000){
+        reject(new Error('Files over ~700KB need Firebase Storage (paid Blaze plan) — keep uploads small or use an image.'));
+        return;
       }
-    );
+      const reader = new FileReader();
+      reader.onload = () => { onProgress && onProgress(60); done(reader.result, { dataUrl: true }); };
+      reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+function downscaleImage(file, maxSide, quality){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      try{
+        let { width, height } = img;
+        const scale = Math.min(1, maxSide / Math.max(width, height));
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(objUrl);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } catch(e){ URL.revokeObjectURL(objUrl); reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(objUrl); reject(new Error('Could not read that image')); };
+    img.src = objUrl;
   });
 }
 

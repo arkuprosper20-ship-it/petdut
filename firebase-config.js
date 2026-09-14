@@ -1,14 +1,10 @@
 // ============================================================
-// Junior Codex — Firebase project config
+// Junior Codex — Firebase project config (ADMIN LOCKED)
 // ============================================================
-// 1. Go to https://console.firebase.google.com → create a project
-// 2. Project settings → General → "Your apps" → add a Web app
-// 3. Copy the config object Firebase gives you and paste the values below
-// 4. In the console, enable:
-//      - Authentication → Sign-in method → Email/Password
-//      - Firestore Database → Create database (start in production mode)
-//      - Storage → Get started
-//    Then apply the security rules from README.md
+// SINGLE ADMIN — this UID is the ONLY account that can open admin.html
+// and approve/post. Everyone else is bounced back to index.html, and the
+// Firestore rules below enforce the same gate server-side.
+// To rotate admin: replace the UID here AND in firestore.rules, redeploy.
 // ============================================================
 
 export const firebaseConfig = {
@@ -23,12 +19,13 @@ export const firebaseConfig = {
 
 // NOTE: These are public client-side Firebase keys — Firebase docs state
 // they are safe to ship in client code. Access is enforced by
-// Firestore/Storage security rules, not by hiding these values.
+// Firestore security rules, not by hiding these values.
 
 
-// SINGLE ADMIN — paste the admin's Firebase Auth UID here when you have it.
-// While this is "" (empty), any signed-in member can open admin.html so you
-// can test end-to-end. The moment you paste a UID, only that user can open
-// the dashboard and approve/post (rules in firestore.rules must be tightened
-// with the same UID — see the commented block at the top of that file).
-export const ADMIN_UID = "";
+// SINGLE ADMIN — paste YOUR Firebase Auth UID between the quotes when you
+// have it (sign up on the live site first, then copy the UID from the
+// Firebase console → Authentication → Users, or from the member app's
+// Settings page which now shows it). While this is "" (empty), any
+// signed-in member can open admin.html so you can test end-to-end — but
+//Firestore rules below already require this UID for admin writes.
+export const ADMIN_UID = "PASTE_YOUR_UID_HERE";

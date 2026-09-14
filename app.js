@@ -229,21 +229,36 @@ function state_reset(){ state.step = 0; renderOnboard(); }
 
 function friendlyAuthError(e){
   const code = (e && e.code) || '';
+  const raw = (e && e.message) || '';
+  // Never show a bare "something went wrong": surface the real cause + fix.
+  if(code.includes('configuration-not-found') || raw.includes('CONFIGURATION_NOT_FOUND'))
+    return 'Sign-in is not switched on yet in Firebase. Fix: Firebase console → Build → Authentication → Get started → enable Email/Password, then reload this page.';
+  if(code.includes('operation-not-allowed'))
+    return 'The Email/Password sign-in method is disabled. Fix: Firebase console → Authentication → Sign-in method → Email/Password → Enable → Save.';
   if(code.includes('user-not-found') || code.includes('invalid-credential')) return "We couldn't find that account — check the email, or sign up instead.";
   if(code.includes('wrong-password')) return 'That password looks wrong.';
   if(code.includes('email-already-in-use')) return 'That email already has an account — try signing in instead.';
   if(code.includes('weak-password')) return 'Password needs to be at least 6 characters.';
   if(code.includes('invalid-email')) return 'That email address looks off.';
-  return 'Something went wrong — please try again.';
+  if(code.includes('too-many-requests')) return 'Too many attempts — wait a minute and try again.';
+  if(code.includes('network-request-failed')) return 'Network hiccup — check your connection and try again.';
+  if(code.includes('permission-denied')) return 'Account created, but saving your profile was blocked by Firestore rules — ask the admin to check Firestore rules.';
+  console.error('[auth]', e);
+  const detail = raw ? ' (' + raw.slice(0, 160) + ')' : '';
+  return 'Could not complete that' + detail + ' — copy this message to the admin if it keeps happening.';
 }
 
 async function submitSignIn(){
-  if(!requireFirebase()) return;
-  const email = document.getElementById('si_email').value.trim();
-  const password = document.getElementById('si_password').value;
+  const emailEl = document.getElementById('si_email');
+  const pwEl = document.getElementById('si_password');
+  const email = (emailEl.value || '').trim();
+  const password = pwEl.value || '';
   const err = document.getElementById('authError');
   const btn = document.getElementById('signinBtn');
   err.style.display = 'none';
+  if(!requireFirebase()) return;
+  if(!email || !/^\S+@\S+\.\S+$/.test(email)){ err.textContent = 'Enter your email address first.'; err.style.display = 'block'; emailEl.focus(); return; }
+  if(!password){ err.textContent = 'Enter your password.'; err.style.display = 'block'; pwEl.focus(); return; }
   btn.disabled = true; btn.textContent = 'Signing in…';
   try{
     const profile = await signInMember(email, password);
@@ -309,6 +324,19 @@ async function completeSignUp(){
   }
   const btn = document.getElementById('enterBtn');
   err.style.display = 'none';
+  // The email/password were collected back on step 1 — re-validate here so the
+  // error shows on this screen instead of silently failing later.
+  const f = state.form;
+  if(!f.email || !/^\S+@\S+\.\S+$/.test((f.email || '').trim())){
+    err.textContent = 'That email address looks off — go Back to step 1 and fix it.';
+    err.style.display = 'block';
+    return;
+  }
+  if(!f.password || f.password.length < 6){
+    err.textContent = 'Password needs to be at least 6 characters — go Back to step 1 and fix it.';
+    err.style.display = 'block';
+    return;
+  }
   btn.disabled = true; btn.textContent = 'Creating your account…';
   try{
     const f = state.form;
@@ -1144,6 +1172,8 @@ function toggleAIKeyField(){
 
 function loadAISettings(){
   const profile = state.profile;
+  const uidField = document.getElementById('setUid');
+  if(uidField) uidField.value = state.uid || '';
   if(!profile) return;
   const provider = profile.aiProvider || '';
   const apiKey = profile.aiApiKey || '';
@@ -1189,6 +1219,16 @@ async function saveSettings(){
   document.querySelectorAll('[data-pref]').forEach(el => { prefs[el.dataset.pref] = el.classList.contains('on'); });
   await updateProfile(state.uid, { bio, avatarIndex: state.avatarSel, prefs });
   showToast('Profile saved');
+}
+
+function copyUid(){
+  const field = document.getElementById('setUid');
+  const uid = (field && field.value) || state.uid || '';
+  if(!uid){ showToast('Sign in first to get your ID'); return; }
+  const done = () => showToast('User ID copied — send it to the admin');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(uid).then(done).catch(()=>{ field.select(); document.execCommand('copy'); done(); });
+  } else { field.select(); document.execCommand('copy'); done(); }
 }
 
 /* ============ CONTRIBUTORS / PERSONALIZE ============ */
@@ -1284,7 +1324,7 @@ Object.assign(window, {
   nextStep, prevStep, goSignIn, backToWelcome, state_reset, submitSignIn, saveStep1, pickChip, toggleInterest,
   pickYN, handleHackStep, finishOnboard, completeSignUp, handleSignOut, goPage, setSort, toggleProposeGame,
   submitProposeGame, hostGame, joinGame, winGame, postSuggestion, react, handleChatSearch, startChat, openThread,
-  closeThread, sendThreadMessage, blockActiveChat, selectAvatar, saveSettings, toggleDesignTheme, submitTheme,
+  closeThread, sendThreadMessage, blockActiveChat, selectAvatar, saveSettings, copyUid, toggleDesignTheme, submitTheme,
   showToast, closeGuide, guideNext,
   openGameOverlay, closeGameOverlay, updateThroneDeadline, startThrone, submitThrone,
   createPrimusChallenge, openPrimusChallenge, submitPrimusAnswer, renderPrimusSolver, renderPrimusAuthor, switchPrimusTab,

@@ -1,6 +1,6 @@
 /* ============ admin.js — admin dashboard, wired to Firebase ============ */
 import {
-  isConfigured, watchAuth, signInMember, signOutMember, getProfile,
+  isConfigured, ADMIN_UID_SET, isAdminUid, watchAuth, signInMember, signOutMember, getProfile,
   onAllUsers, onEvents, postEvent, onPending, approvePending, declinePending,
   uploadAsset, seedIfEmpty,
   approveThroneAttempt, declineThroneAttempt, approvePrimusAttempt, declinePrimusChallenge,
@@ -125,7 +125,7 @@ async function handlePostEvent(){
   try{ await broadcastEventNotification(eventId, title); } catch(e){ /* best-effort */ }
 }
 
-/* ============ UPLOADS (real Firebase Storage) ============ */
+/* ============ UPLOADS (Firestore data-URLs — no Storage needed) ============ */
 async function handleUpload(category, inputId, statusId, barId){
   if(!requireFirebase()) return;
   const input = document.getElementById(inputId);
@@ -137,12 +137,13 @@ async function handleUpload(category, inputId, statusId, barId){
   try{
     await uploadAsset(category, file, pct => { bar.style.width = pct + '%'; status.textContent = pct + '%'; });
     status.textContent = 'Uploaded ✓';
-    showToast(`${file.name} uploaded to ${category}`);
+    showToast(file.name + ' uploaded to ' + category);
     input.value = '';
     setTimeout(()=>{ bar.style.width='0%'; status.textContent=''; }, 1800);
   } catch(e){
-    status.textContent = 'Failed — check Storage rules';
-    showToast('Upload failed — see console');
+    const msg = (e && e.message) || 'Upload failed';
+    status.textContent = msg.slice(0, 80);
+    showToast(msg);
     console.error(e);
   }
 }
@@ -160,18 +161,31 @@ function showToast(msg){
 /* ============ AUTH GATE + BOOTSTRAP ============ */
 function friendlyAuthError(e){
   const code = (e && e.code) || '';
+  const raw = (e && e.message) || '';
+  if(code.includes('configuration-not-found') || raw.includes('CONFIGURATION_NOT_FOUND'))
+    return 'Sign-in is not switched on yet in Firebase. Fix: Firebase console → Build → Authentication → Get started → enable Email/Password, then reload this page.';
+  if(code.includes('operation-not-allowed'))
+    return 'The Email/Password sign-in method is disabled. Fix: Firebase console → Authentication → Sign-in method → Email/Password → Enable → Save.';
   if(code.includes('user-not-found') || code.includes('invalid-credential')) return "We couldn't find that account — sign up as a member first.";
   if(code.includes('wrong-password')) return 'That password looks wrong.';
   if(code.includes('invalid-email')) return 'That email address looks off.';
-  return 'Something went wrong — please try again.';
+  if(code.includes('too-many-requests')) return 'Too many attempts — wait a minute and try again.';
+  if(code.includes('network-request-failed')) return 'Network hiccup — check your connection and try again.';
+  console.error('[admin auth]', e);
+  const detail = raw ? ' (' + raw.slice(0, 160) + ')' : '';
+  return 'Could not sign in' + detail + ' — copy this message to the admin if it keeps happening.';
 }
 async function handleGateSignIn(){
-  if(!requireFirebase()) return;
-  const email = document.getElementById('ga_email').value.trim();
-  const password = document.getElementById('ga_password').value;
+  const emailEl = document.getElementById('ga_email');
+  const pwEl = document.getElementById('ga_password');
+  const email = (emailEl.value || '').trim();
+  const password = pwEl.value || '';
   const err = document.getElementById('authError');
   const btn = document.getElementById('gateSigninBtn');
   err.style.display = 'none';
+  if(!requireFirebase()) return;
+  if(!email || !/^\S+@\S+\.\S+$/.test(email)){ err.textContent = 'Enter your email address first.'; err.style.display = 'block'; emailEl.focus(); return; }
+  if(!password){ err.textContent = 'Enter your password.'; err.style.display = 'block'; pwEl.focus(); return; }
   btn.disabled = true; btn.textContent = 'Signing in…';
   try{
     await signInMember(email, password);
@@ -197,6 +211,14 @@ if(!isConfigured){
     if(!user){
       document.getElementById('authGate').style.display = 'flex';
       document.getElementById('adminMain').style.display = 'none';
+      return;
+    }
+    // SINGLE ADMIN gate — non-admin members are sent back to the member app.
+    // While ADMIN_UID is unset (testing mode) everyone passes; once you paste
+    // your UID and redeploy, only that account can open this dashboard.
+    if(!isAdminUid(user.uid)){
+      alert('This page is for the community admin only.');
+      window.location.href = 'index.html';
       return;
     }
     document.getElementById('authGate').style.display = 'none';

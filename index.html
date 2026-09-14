@@ -180,6 +180,11 @@
       <section class="page" id="page-settings">
         <div class="page-head"><h2>Settings</h2><p>Your profile and preferences</p></div>
         <div class="glass settings-section">
+          <h4>Account</h4>
+          <div class="field"><label>Your user ID (send this to the admin to unlock admin access)</label><input type="text" id="setUid" readonly onclick="this.select()" placeholder="Sign in to see your ID"></div>
+          <button class="btn btn-sm" onclick="copyUid()">Copy my user ID</button>
+        </div>
+        <div class="glass settings-section">
           <h4>Profile</h4>
           <div class="field"><label>Username</label><input type="text" id="setUsername"></div>
           <div class="field"><label>Bio</label><textarea id="setBio" style="min-height:60px" placeholder="Tell the community about you"></textarea></div>
